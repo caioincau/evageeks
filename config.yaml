@@ -1,0 +1,10 @@
+wiki_url: https://wiki.evageeks.org
+batch_size: 500
+image_workers: 5
+chunk_size: 512
+chunk_overlap: 50
+embed_model: text-embedding-3-small
+embed_dimensions: 1536
+database_url: postgresql://localhost/evageeks
+rate_limit_delay: 0.5
+data_dir: data
