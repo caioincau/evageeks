@@ -90,10 +90,7 @@ def _extract_internal_links(wikicode) -> list:
 
 
 def _extract_external_links(wikicode) -> list:
-    links = []
-    for node in wikicode.filter_external_links():
-        links.append(str(node.url))
-    return links
+    return [str(node.url) for node in wikicode.filter_external_links() if node.url]
 
 
 def _extract_references(wikicode) -> list:
