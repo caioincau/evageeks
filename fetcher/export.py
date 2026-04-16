@@ -99,7 +99,7 @@ def run_fetch(wiki_url: str, output_dir: str, batch_size: int = 500) -> None:
                 root = ET.fromstring(part)
                 for page in root.findall("page"):
                     f.write(ET.tostring(page))
-            except ET.ParseError:
-                pass
+            except ET.ParseError as e:
+                print(f"  Warning: failed to parse XML batch: {e}")
         f.write(b"</mediawiki>")
     print(f"Saved to {merged_path}")
