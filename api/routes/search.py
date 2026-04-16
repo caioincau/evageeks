@@ -1,0 +1,44 @@
+# api/routes/search.py
+from fastapi import APIRouter, Request
+from pydantic import BaseModel
+from ingester.embedder import generate_embeddings
+
+router = APIRouter()
+
+
+class SearchRequest(BaseModel):
+    query: str
+    top_k: int = 5
+
+
+@router.post("/search")
+def semantic_search(body: SearchRequest, request: Request):
+    conn = request.app.state.db
+    embeddings = generate_embeddings([body.query])
+    query_vector = embeddings[0]
+
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT
+                c.content,
+                c.section,
+                a.slug,
+                a.title,
+                1 - (c.embedding <=> %s::vector) AS score
+            FROM chunks c
+            JOIN articles a ON a.id = c.article_id
+            ORDER BY c.embedding <=> %s::vector
+            LIMIT %s
+        """, (query_vector, query_vector, body.top_k))
+        rows = cur.fetchall()
+
+    return [
+        {
+            "content": r[0],
+            "section": r[1],
+            "article_slug": r[2],
+            "article_title": r[3],
+            "score": float(r[4]),
+        }
+        for r in rows
+    ]
