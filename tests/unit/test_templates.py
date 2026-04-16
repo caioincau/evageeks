@@ -30,3 +30,17 @@ def test_fetch_templates_returns_wikitext():
     )
     assert "Template:Infobox character" in templates
     assert "Infobox" in templates["Template:Infobox character"]
+
+
+def test_collect_template_names_prefixes_and_deduplicates():
+    from fetcher.templates import collect_template_names
+    articles = [
+        {"templates": ["Infobox character", "Template:Navbox"]},
+        {"templates": ["Infobox character", "Cite"]},
+    ]
+    names = collect_template_names(articles)
+    assert "Template:Infobox character" in names
+    assert "Template:Navbox" in names
+    assert "Template:Cite" in names
+    assert names == sorted(names)  # sorted
+    assert len(names) == len(set(names))  # no duplicates
