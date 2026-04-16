@@ -1,0 +1,20 @@
+{
+  "pageid": 42,
+  "revid": 1001,
+  "title": "Rei Ayanami",
+  "displaytitle": "Rei Ayanami",
+  "ns": 0,
+  "contentmodel": "wikitext",
+  "pagelanguage": "en",
+  "touched": "2024-01-15T10:00:00Z",
+  "length": 512,
+  "text": {"*": "<p><b>Rei Ayanami</b> is a fictional character...</p>"},
+  "sections": [
+    {"index": "1", "toclevel": 1, "level": "2", "line": "Background", "anchor": "Background", "byteoffset": 200}
+  ],
+  "iwlinks": [],
+  "langlinks": [],
+  "properties": {},
+  "protection": [],
+  "parsewarnings": []
+}
