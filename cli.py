@@ -101,7 +101,13 @@ def cmd_ingest(args):
                 set_fetch_state(conn, "last_ingested", {"slug": slug, "index": i})
                 print(f"  Ingested {i + 1}/{len(files)}")
         except Exception as e:
+            error_file = Path(f"{data_dir}/errors/{slug}.txt")
+            error_file.parent.mkdir(exist_ok=True)
+            error_file.write_text(str(e))
             print(f"  Error ingesting {slug}: {e}")
+
+    if files:
+        set_fetch_state(conn, "last_ingested", {"slug": files[-1].stem, "index": len(files) - 1})
 
     conn.close()
     print("Ingest complete.")
