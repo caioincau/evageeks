@@ -62,14 +62,19 @@ def get_article(slug: str, request: Request):
 @router.get("/articles/{slug}/images")
 def get_article_images(slug: str, request: Request):
     conn = request.app.state.db
+    # Verify article exists first
+    with conn.cursor() as cur:
+        cur.execute("SELECT id FROM articles WHERE slug = %s", (slug,))
+        article_row = cur.fetchone()
+    if not article_row:
+        raise HTTPException(status_code=404, detail="Article not found")
     with conn.cursor() as cur:
         cur.execute("""
             SELECT i.filename, i.url, i.local_path, i.mime_type, i.width, i.height
             FROM images i
             JOIN article_images ai ON ai.image_id = i.id
-            JOIN articles a ON a.id = ai.article_id
-            WHERE a.slug = %s
-        """, (slug,))
+            WHERE ai.article_id = %s
+        """, (article_row[0],))
         rows = cur.fetchall()
     cols = ["filename", "url", "local_path", "mime_type", "width", "height"]
     return [dict(zip(cols, r)) for r in rows]

@@ -1,5 +1,5 @@
 # api/routes/search.py
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 from ingester.embedder import generate_embeddings
 
@@ -14,7 +14,10 @@ class SearchRequest(BaseModel):
 @router.post("/search")
 def semantic_search(body: SearchRequest, request: Request):
     conn = request.app.state.db
-    embeddings = generate_embeddings([body.query])
+    try:
+        embeddings = generate_embeddings([body.query])
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Embedding service unavailable: {e}")
     query_vector = embeddings[0]
 
     with conn.cursor() as cur:
