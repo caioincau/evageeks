@@ -63,3 +63,18 @@ def test_fetch_state_roundtrip(db_conn):
     state = get_fetch_state(db_conn, "last_page")
     assert state["title"] == "Rei Ayanami"
     assert state["index"] == 5
+
+
+def test_upsert_article_chunks_not_duplicated(db_conn):
+    chunks = [
+        {"section": "_summary", "content": "Rei is a character.", "position": 0, "token_count": 4},
+        {"section": "Background", "content": "She is the First Child.", "position": 1, "token_count": 5},
+    ]
+    with patch("ingester.loader.generate_embeddings", return_value=[[0.1] * 1536, [0.2] * 1536]):
+        article_id = upsert_article(db_conn, SAMPLE_ARTICLE, chunks=chunks)
+    with patch("ingester.loader.generate_embeddings", return_value=[[0.1] * 1536, [0.2] * 1536]):
+        upsert_article(db_conn, SAMPLE_ARTICLE, chunks=chunks)
+    with db_conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM chunks WHERE article_id = %s", (article_id,))
+        count = cur.fetchone()[0]
+    assert count == 2  # exactly 2 chunks, not 4
