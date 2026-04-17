@@ -3,7 +3,9 @@ from pathlib import Path
 from typing import Optional
 from psycopg2.extensions import connection
 from psycopg2.extras import Json
+import numpy as np
 import yaml
+from pgvector.psycopg2 import register_vector
 from ingester.embedder import generate_embeddings
 
 
@@ -21,6 +23,7 @@ def upsert_article(
     """Insert or update an article and its chunks. Returns article id."""
     try:
         with conn.cursor() as cur:
+            register_vector(conn)
             cur.execute("""
                 INSERT INTO articles (
                     page_id, slug, title, display_title, namespace, content_model,
@@ -83,11 +86,11 @@ def upsert_article(
                 for chunk, embedding in zip(chunks, embeddings):
                     cur.execute("""
                         INSERT INTO chunks (article_id, section, content, position, token_count, embedding, embed_model)
-                        VALUES (%s, %s, %s, %s, %s, %s::vector, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)
                     """, (
                         article_id, chunk["section"], chunk["content"],
                         chunk["position"], chunk["token_count"],
-                        '[' + ','.join(str(x) for x in embedding) + ']', embed_model,
+                        np.array(embedding), embed_model,
                     ))
 
         conn.commit()
