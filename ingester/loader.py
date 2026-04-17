@@ -59,13 +59,30 @@ def upsert_article(
                     fetched_at = NOW()
                 RETURNING id
             """, {
-                **article,
+                "page_id": article.get("page_id"),
+                "slug": article.get("slug"),
+                "title": article.get("title"),
+                "display_title": article.get("display_title"),
+                "namespace": article.get("namespace", 0),
+                "content_model": article.get("content_model"),
+                "language": article.get("language"),
+                "wikitext": article.get("wikitext"),
+                "html": article.get("html"),
+                "summary": article.get("summary"),
                 "sections": Json(article.get("sections", [])),
+                "categories": article.get("categories", []),
                 "infobox": Json(article.get("infobox", {})),
+                "templates": article.get("templates", []),
+                "internal_links": article.get("internal_links", []),
+                "external_links": article.get("external_links", []),
                 "iw_links": Json(article.get("iw_links", [])),
                 "lang_links": Json(article.get("lang_links", [])),
                 "properties": Json(article.get("properties", {})),
                 "protection": Json(article.get("protection", [])),
+                "rev_id": article.get("rev_id"),
+                "length_bytes": article.get("length_bytes"),
+                "parse_warnings": article.get("parse_warnings", []),
+                "touched_at": article.get("touched_at"),
             })
             article_id = cur.fetchone()[0]
 
