@@ -115,6 +115,10 @@ def create_schema(conn: connection) -> None:
                 CREATE INDEX IF NOT EXISTS idx_articles_templates
                 ON articles USING gin (templates)
             """)
+            cur.execute("""
+                CREATE INDEX IF NOT EXISTS idx_chunks_embedding
+                ON chunks USING hnsw (embedding vector_cosine_ops)
+            """)
         conn.commit()
     except Exception:
         conn.rollback()
