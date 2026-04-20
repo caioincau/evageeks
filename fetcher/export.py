@@ -91,13 +91,14 @@ def run_fetch(wiki_url: str, output_dir: str, batch_size: int = 500) -> None:
             error_file.write_text(str(e))
             print(f"  Error in batch {i}: {e}")
 
+    NS = "http://www.mediawiki.org/xml/export-0.11/"
     merged_path = output_path / "articles.xml"
     with open(merged_path, "wb") as f:
         f.write(b"<mediawiki>\n")
         for part in all_xml_parts:
             try:
                 root = ET.fromstring(part)
-                for page in root.findall("page"):
+                for page in root.findall(f"{{{NS}}}page"):
                     f.write(ET.tostring(page))
             except ET.ParseError as e:
                 print(f"  Warning: failed to parse XML batch: {e}")

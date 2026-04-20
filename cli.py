@@ -34,15 +34,16 @@ def cmd_parse(args):
     errors_dir.mkdir(exist_ok=True)
 
     session = httpx.Client(timeout=30.0)
+    NS = "http://www.mediawiki.org/xml/export-0.11/"
     tree = ET.parse(xml_path)
     root = tree.getroot()
-    pages = root.findall(".//page")
+    pages = root.findall(f".//{{{NS}}}page")
 
     print(f"Parsing {len(pages)} articles...")
     for i, page in enumerate(pages):
-        title_el = page.find("title")
+        title_el = page.find(f"{{{NS}}}title")
         title = title_el.text if title_el is not None else ""
-        text_el = page.find(".//text")
+        text_el = page.find(f".//{{{NS}}}text")
         wikitext = text_el.text or "" if text_el is not None else ""
 
         try:
@@ -61,7 +62,8 @@ def cmd_parse(args):
                 json.dumps(output, ensure_ascii=False, default=str)
             )
         except Exception as e:
-            (errors_dir / f"{title}.txt").write_text(str(e))
+            safe_title = title.replace("/", "_").replace("\\", "_")
+            (errors_dir / f"{safe_title}.txt").write_text(str(e))
             print(f"  Error parsing {title}: {e}")
 
         if (i + 1) % 100 == 0:

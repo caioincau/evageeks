@@ -1,5 +1,6 @@
 # parser/chunker.py
 import tiktoken
+import mwparserfromhell
 
 _ENCODER = tiktoken.get_encoding("cl100k_base")
 
@@ -23,38 +24,42 @@ def _split_text(text: str, chunk_size: int, overlap: int) -> list:
     return chunks
 
 
+def _extract_plain_text(wikitext: str) -> str:
+    """Extract clean plain text from wikitext using mwparserfromhell."""
+    try:
+        wikicode = mwparserfromhell.parse(wikitext)
+        return wikicode.strip_code()
+    except Exception:
+        return wikitext
+
+
 def chunk_article(article: dict, chunk_size: int = 512, overlap: int = 50) -> list:
     """
     Split an article into overlapping chunks for RAG.
+    Uses wikitext as source, extracting plain text via mwparserfromhell.
     Returns list of dicts with: article_slug, section, content, position, token_count.
     """
     chunks = []
     position = 0
-    slug = article["slug"]
+    slug = article.get("slug", "")
 
-    if article.get("summary"):
-        for text in _split_text(article["summary"], chunk_size, overlap):
-            chunks.append({
-                "article_slug": slug,
-                "section": "_summary",
-                "content": text,
-                "position": position,
-                "token_count": _count_tokens(text),
-            })
-            position += 1
+    wikitext = article.get("wikitext") or ""
+    plain_text = _extract_plain_text(wikitext).strip() if wikitext else ""
 
-    for section in article.get("sections", []):
-        content = section.get("content", "")
-        if not content:
-            continue
-        for text in _split_text(content, chunk_size, overlap):
-            chunks.append({
-                "article_slug": slug,
-                "section": section.get("line", ""),
-                "content": text,
-                "position": position,
-                "token_count": _count_tokens(text),
-            })
-            position += 1
+    if not plain_text and article.get("summary"):
+        plain_text = article["summary"]
+
+    if not plain_text:
+        return chunks
+
+    for text in _split_text(plain_text, chunk_size, overlap):
+        chunks.append({
+            "article_slug": slug,
+            "section": "",
+            "content": text,
+            "position": position,
+            "token_count": _count_tokens(text),
+        })
+        position += 1
 
     return chunks
