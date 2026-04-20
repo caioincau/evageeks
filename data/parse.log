@@ -1,0 +1,19 @@
+Parsing 1266 articles...
+  Error parsing A.T. Field/en: [Errno 2] No such file or directory: 'data/parsed/A.T._Field/en.json'
+  Parsed 100/1266
+  Parsed 200/1266
+  Error parsing Episode 01/Credits: [Errno 2] No such file or directory: 'data/parsed/Episode_01/Credits.json'
+  Error parsing Episode 1/Credits: [Errno 2] No such file or directory: 'data/parsed/Episode_1/Credits.json'
+  Parsed 300/1266
+  Error parsing Evangelion: 3.0+1.0 Thrice Upon A Time/Gallery: [Errno 2] No such file or directory: 'data/parsed/Evangelion:_3.0+1.0_Thrice_Upon_A_Time/Gallery.json'
+  Parsed 400/1266
+  Parsed 500/1266
+  Parsed 600/1266
+  Parsed 700/1266
+  Parsed 800/1266
+  Parsed 900/1266
+  Error parsing Schizo/Parano: [Errno 2] No such file or directory: 'data/parsed/Schizo/Parano.json'
+  Parsed 1000/1266
+  Parsed 1100/1266
+  Parsed 1200/1266
+Parse complete.
