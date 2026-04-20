@@ -58,6 +58,7 @@ def cmd_parse(args):
             chunks = chunk_article(parsed, config["chunk_size"], config["chunk_overlap"])
             output = {**parsed, "chunks": chunks}
             slug = parsed.get("slug") or title.replace(" ", "_")
+            slug = slug.replace("/", "_")
             (parsed_dir / f"{slug}.json").write_text(
                 json.dumps(output, ensure_ascii=False, default=str)
             )
