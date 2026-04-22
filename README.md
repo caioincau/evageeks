@@ -53,6 +53,8 @@ embed_dimensions: 1536
 database_url: postgresql://postgres:postgres@localhost/evageeks
 rate_limit_delay: 0.5    # seconds between wiki API requests
 data_dir: data
+llm_model: claude-sonnet-4-20250514  # LLM for /ask endpoint
+llm_base_url: null       # null = auto-detect, or set to http://localhost:11434/v1 for Ollama
 ```
 
 ## API Endpoints
@@ -63,11 +65,20 @@ data_dir: data
 | `GET` | `/articles/{slug}` | Full article with metadata |
 | `GET` | `/articles/{slug}/images` | Images for an article |
 | `POST` | `/search` | Semantic search (RAG) |
+| `POST` | `/ask` | Ask a question, get a streamed answer (SSE) |
 | `GET` | `/categories/{name}` | Articles in a category |
 
 Swagger docs available at `http://localhost:8000/docs`.
 
-### Search example
+### Ask example (streamed answer)
+
+```bash
+curl -N -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Who is Rei Ayanami?", "top_k": 5}'
+```
+
+### Search example (raw chunks)
 
 ```bash
 curl -X POST http://localhost:8000/search \

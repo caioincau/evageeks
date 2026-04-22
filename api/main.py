@@ -1,7 +1,7 @@
 # api/main.py
 from fastapi import FastAPI
 from psycopg2.extensions import connection
-from api.routes import articles, search, categories
+from api.routes import articles, search, categories, ask
 
 
 def create_app(db_conn: connection = None) -> FastAPI:
@@ -10,4 +10,5 @@ def create_app(db_conn: connection = None) -> FastAPI:
     app.include_router(articles.router)
     app.include_router(search.router)
     app.include_router(categories.router)
+    app.include_router(ask.router)
     return app
