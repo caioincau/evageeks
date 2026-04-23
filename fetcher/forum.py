@@ -10,6 +10,14 @@ from html.parser import HTMLParser
 
 FORUM_URL = "https://forum.evageeks.org"
 
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+}
+
+
+def _make_session() -> httpx.Client:
+    return httpx.Client(timeout=60.0, follow_redirects=True, headers=_HEADERS)
+
 # High-value subforums
 SUBFORUMS = {
     "evangelion-tv-eoe": 4,
@@ -74,7 +82,7 @@ def fetch_thread_list(
     rate_limit: float = 1.0,
 ) -> list[dict]:
     """Fetch thread URLs from a subforum."""
-    session = session or httpx.Client(timeout=30.0, follow_redirects=True)
+    session = session or _make_session()
     threads = []
 
     for page in range(max_pages):
@@ -119,59 +127,78 @@ def fetch_thread_list(
 def fetch_thread_posts(
     thread_url: str,
     session: Optional[httpx.Client] = None,
-    rate_limit: float = 1.0,
+    rate_limit: float = 2.0,
+    retries: int = 3,
 ) -> list[dict]:
     """Fetch all posts from a forum thread using regex extraction."""
-    session = session or httpx.Client(timeout=30.0, follow_redirects=True)
+    session = session or _make_session()
 
-    try:
-        resp = session.get(thread_url)
-        resp.raise_for_status()
-        html = resp.text
+    for attempt in range(retries):
+        try:
+            resp = session.get(thread_url)
+            if resp.status_code == 522:
+                wait = rate_limit * (2 ** attempt) + 5
+                print(f"    522 rate limit, waiting {wait:.0f}s (attempt {attempt + 1}/{retries})")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            html = resp.text
+            break
+        except Exception as e:
+            if attempt < retries - 1:
+                wait = rate_limit * (2 ** attempt) + 3
+                time.sleep(wait)
+                continue
+            print(f"  Error fetching thread {thread_url}: {e}")
+            return []
 
-        # Extract post content blocks using common phpBB patterns
-        posts = []
-        # Try postbody/content divs
-        for match in re.finditer(r'<div[^>]*class="[^"]*(?:postbody|content)[^"]*"[^>]*>(.*?)</div>', html, re.DOTALL):
+    # Extract post content blocks using common phpBB patterns
+    posts = []
+    # Try postbody/content divs
+    for match in re.finditer(r'<div[^>]*class="[^"]*(?:postbody|content)[^"]*"[^>]*>(.*?)</div>', html, re.DOTALL):
+        text = re.sub(r'<[^>]+>', ' ', match.group(1))
+        text = re.sub(r'\s+', ' ', text).strip()
+        if len(text) > 50:
+            posts.append({"author": "", "content": text})
+
+    # Fallback: extract paragraphs from the page if no postbody found
+    if not posts:
+        for match in re.finditer(r'<p[^>]*>(.*?)</p>', html, re.DOTALL):
             text = re.sub(r'<[^>]+>', ' ', match.group(1))
             text = re.sub(r'\s+', ' ', text).strip()
-            if len(text) > 50:
+            if len(text) > 100:
                 posts.append({"author": "", "content": text})
 
-        # Fallback: extract paragraphs from the page if no postbody found
-        if not posts:
-            for match in re.finditer(r'<p[^>]*>(.*?)</p>', html, re.DOTALL):
-                text = re.sub(r'<[^>]+>', ' ', match.group(1))
-                text = re.sub(r'\s+', ' ', text).strip()
-                if len(text) > 100:
-                    posts.append({"author": "", "content": text})
-
-        time.sleep(rate_limit)
-        return posts
-    except Exception as e:
-        print(f"  Error fetching thread {thread_url}: {e}")
-        return []
+    time.sleep(rate_limit)
+    return posts
 
 
 def run_forum_fetch(
     output_dir: str,
     max_threads_per_subforum: int = 9999,
-    rate_limit: float = 1.0,
+    rate_limit: float = 2.0,
 ) -> list[dict]:
     """Fetch forum threads and save as JSON articles for ingestion."""
     import json
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    session = httpx.Client(timeout=30.0, follow_redirects=True)
+    session = _make_session()
     all_articles = []
 
     for subforum_name, subforum_id in SUBFORUMS.items():
         print(f"Fetching {subforum_name} (id={subforum_id})...")
-        threads = fetch_thread_list(subforum_id, max_pages=200, session=session, rate_limit=rate_limit)
+        threads = fetch_thread_list(subforum_id, max_pages=200, session=session, rate_limit=max(rate_limit, 3.0))
         print(f"  Found {len(threads)} threads")
 
+        skipped = 0
         for i, thread in enumerate(threads[:max_threads_per_subforum]):
+            slug = f"forum_{subforum_name}_{thread['thread_id']}"
+            outfile = output_path / f"{slug}.json"
+            if outfile.exists():
+                skipped += 1
+                continue
+
             posts = fetch_thread_posts(thread["url"], session=session, rate_limit=rate_limit)
             if not posts:
                 continue
@@ -219,8 +246,11 @@ def run_forum_fetch(
             outfile.write_text(json.dumps(article, ensure_ascii=False, default=str))
             all_articles.append(article)
 
-            if (i + 1) % 10 == 0:
-                print(f"  Fetched {i + 1}/{min(len(threads), max_threads_per_subforum)} threads")
+            if (i + 1 - skipped) % 10 == 0 and (i + 1 - skipped) > 0:
+                print(f"  Fetched {i + 1 - skipped} new / {skipped} skipped / {len(threads)} total")
 
-    print(f"Total: {len(all_articles)} forum articles saved to {output_path}")
+        if skipped:
+            print(f"  Skipped {skipped} already downloaded threads")
+
+    print(f"Total: {len(all_articles)} new forum articles saved to {output_path}")
     return all_articles
