@@ -14,9 +14,19 @@ GWERN_INTERVIEWS = [
         "date": "1996-06-01",
     },
     {
-        "url": "https://gwern.net/doc/anime/eva/1997-animeland-anno-interview",
-        "title": "Hideaki Anno - AnimeLand Interview (May 1997)",
+        "url": "https://gwern.net/doc/anime/eva/1997-anno-english",
+        "title": "Hideaki Anno - AnimeLand Interview (May 1997, English)",
         "date": "1997-05-01",
+    },
+    {
+        "url": "https://gwern.net/doc/anime/eva/2010-crc",
+        "title": "Evangelion 2.0 Complete Records Collection",
+        "date": "2010-01-01",
+    },
+    {
+        "url": "https://gwern.net/doc/anime/eva/1996-animerica-conscience",
+        "title": "The Conscience of the Otaking - Studio Gainax Saga",
+        "date": "1996-01-01",
     },
 ]
 

@@ -12,9 +12,10 @@ FORUM_URL = "https://forum.evageeks.org"
 
 # High-value subforums
 SUBFORUMS = {
-    "evangelion-discussion": 7,
-    "evangelion-analysis": 11,
-    "rebuild-discussion": 15,
+    "evangelion-tv-eoe": 4,
+    "rebuild-discussion": 14,
+    "evangelion-general": 3,
+    "everything-else-eva": 7,
 }
 
 
@@ -84,14 +85,15 @@ def fetch_thread_list(
             resp.raise_for_status()
             html = resp.text
 
-            # Extract thread links: viewtopic.php?t=XXXX
-            for match in re.finditer(r'viewtopic\.php\?[^"]*t=(\d+)[^"]*"[^>]*class="topictitle"[^>]*>([^<]+)', html):
+            # Extract thread links: ./thread/ID/slug/ format
+            for match in re.finditer(r'\./thread/(\d+)/([^/]+)/', html):
                 tid = match.group(1)
-                title = match.group(2).strip()
+                slug = match.group(2)
+                title = slug.replace("-", " ")
                 threads.append({
                     "thread_id": int(tid),
                     "title": title,
-                    "url": f"{FORUM_URL}/viewtopic.php?t={tid}",
+                    "url": f"{FORUM_URL}/thread/{tid}/{slug}/",
                 })
 
             # Stop if no more threads found on this page
@@ -119,16 +121,33 @@ def fetch_thread_posts(
     session: Optional[httpx.Client] = None,
     rate_limit: float = 1.0,
 ) -> list[dict]:
-    """Fetch all posts from a forum thread."""
+    """Fetch all posts from a forum thread using regex extraction."""
     session = session or httpx.Client(timeout=30.0, follow_redirects=True)
 
     try:
         resp = session.get(thread_url)
         resp.raise_for_status()
-        parser = _PostParser()
-        parser.feed(resp.text)
+        html = resp.text
+
+        # Extract post content blocks using common phpBB patterns
+        posts = []
+        # Try postbody/content divs
+        for match in re.finditer(r'<div[^>]*class="[^"]*(?:postbody|content)[^"]*"[^>]*>(.*?)</div>', html, re.DOTALL):
+            text = re.sub(r'<[^>]+>', ' ', match.group(1))
+            text = re.sub(r'\s+', ' ', text).strip()
+            if len(text) > 50:
+                posts.append({"author": "", "content": text})
+
+        # Fallback: extract paragraphs from the page if no postbody found
+        if not posts:
+            for match in re.finditer(r'<p[^>]*>(.*?)</p>', html, re.DOTALL):
+                text = re.sub(r'<[^>]+>', ' ', match.group(1))
+                text = re.sub(r'\s+', ' ', text).strip()
+                if len(text) > 100:
+                    posts.append({"author": "", "content": text})
+
         time.sleep(rate_limit)
-        return parser.posts
+        return posts
     except Exception as e:
         print(f"  Error fetching thread {thread_url}: {e}")
         return []
@@ -136,7 +155,7 @@ def fetch_thread_posts(
 
 def run_forum_fetch(
     output_dir: str,
-    max_threads_per_subforum: int = 50,
+    max_threads_per_subforum: int = 9999,
     rate_limit: float = 1.0,
 ) -> list[dict]:
     """Fetch forum threads and save as JSON articles for ingestion."""
@@ -149,7 +168,7 @@ def run_forum_fetch(
 
     for subforum_name, subforum_id in SUBFORUMS.items():
         print(f"Fetching {subforum_name} (id={subforum_id})...")
-        threads = fetch_thread_list(subforum_id, max_pages=3, session=session, rate_limit=rate_limit)
+        threads = fetch_thread_list(subforum_id, max_pages=200, session=session, rate_limit=rate_limit)
         print(f"  Found {len(threads)} threads")
 
         for i, thread in enumerate(threads[:max_threads_per_subforum]):
