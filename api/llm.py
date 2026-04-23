@@ -9,11 +9,30 @@ from openai import OpenAI
 
 _llm_client = None
 
-SYSTEM_PROMPT = """You are an expert on Neon Genesis Evangelion, drawing from the EvaGeeks wiki.
-Answer the user's question based ONLY on the provided context chunks.
-If the context doesn't contain enough information, say so honestly.
-Cite your sources by mentioning the article title when referencing information.
-Answer in the same language as the question."""
+SYSTEM_PROMPT = """You are an expert scholar on Neon Genesis Evangelion and the Rebuild of Evangelion, \
+drawing from the EvaGeeks wiki — the most comprehensive English-language Evangelion reference.
+
+## Canon Hierarchy
+Always specify which canon you are discussing:
+- **TV Series** (Episodes 1–26, 1995–96): The original Neon Genesis Evangelion.
+- **End of Evangelion** (Episodes 25'/26', 1997): The theatrical ending, distinct from TV eps 25–26.
+- **Rebuild of Evangelion** (1.0, 2.0, 3.0, 3.0+1.0): A separate continuity with significant differences.
+- **Manga** (Sadamoto, 1994–2013): Yoshiyuki Sadamoto's adaptation, diverges from the anime.
+- **ANIMA** (light novel, 2008–2013): An alternate continuation from Episode 24.
+If a topic differs across canons, explain each version separately rather than blending them.
+
+## Attribution Rules
+- When context contains staff quotes (from "Statements by Evangelion Staff"), attribute precisely: \
+who said it, when, and in what publication.
+- Clearly distinguish: **confirmed facts** (from the show/official materials), \
+**staff statements** (from interviews/commentaries), and **fan theories/analysis** (from fan essays).
+- Never present fan analysis as canon fact.
+
+## Response Style
+- Be thorough but accessible. Use specific episode numbers and scene references.
+- For symbolism, psychology, and themes: present multiple interpretations rather than asserting one.
+- Cite the article title and section when referencing information from context.
+- Answer in the same language as the question."""
 
 
 def _load_config() -> dict:
@@ -56,32 +75,54 @@ def get_llm_client() -> OpenAI:
     return _llm_client
 
 
-def build_prompt(question: str, chunks: list[dict]) -> list[dict]:
-    """Build chat messages from question and retrieved chunks."""
+def build_prompt(
+    question: str,
+    chunks: list[dict],
+    history: list[dict] = None,
+) -> list[dict]:
+    """Build chat messages from question, retrieved chunks, and conversation history."""
+    # Build context from chunks with metadata
     context_parts = []
     for i, chunk in enumerate(chunks, 1):
         title = chunk.get("article_title", "Unknown")
         section = chunk.get("section", "")
         content = chunk.get("content", "")
         score = chunk.get("score", 0)
+        categories = chunk.get("categories") or []
+        infobox = chunk.get("infobox") or {}
+
         header = f"[{i}] Article: {title}"
         if section and section != "_intro":
             header += f" > {section}"
+        if categories:
+            header += f" | Categories: {', '.join(categories[:5])}"
         header += f" (relevance: {score:.2f})"
+
+        # Add infobox data if present
+        if infobox:
+            infobox_str = ", ".join(f"{k}={v}" for k, v in list(infobox.items())[:8])
+            header += f"\nInfobox: {infobox_str}"
+
         context_parts.append(f"{header}\n{content}")
 
     context = "\n\n---\n\n".join(context_parts)
 
-    return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
-    ]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    # Add conversation history (last 3 turns = 6 messages)
+    if history:
+        for turn in history[-6:]:
+            messages.append({"role": turn["role"], "content": turn["content"]})
+
+    messages.append({"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"})
+    return messages
 
 
 def stream_answer(
     question: str,
     chunks: list[dict],
     model: str = None,
+    history: list[dict] = None,
 ) -> Generator[str, None, None]:
     """Stream LLM response as SSE events.
 
@@ -90,24 +131,26 @@ def stream_answer(
         data: {"done": true, "sources": [...]}
     """
     config = _load_config()
-    model = model or config.get("llm_model", "claude-sonnet-4-20250514")
+    model = model or config.get("llm_model", "gpt-4o")
     client = get_llm_client()
-    messages = build_prompt(question, chunks)
+    messages = build_prompt(question, chunks, history=history)
 
     stream = client.chat.completions.create(
         model=model,
         messages=messages,
         stream=True,
-        max_tokens=1024,
+        max_tokens=2048,
     )
 
+    full_response = []
     for chunk in stream:
         delta = chunk.choices[0].delta if chunk.choices else None
         if delta and delta.content:
+            full_response.append(delta.content)
             yield f"data: {json.dumps({'token': delta.content})}\n\n"
 
     sources = [
         {"article_title": c.get("article_title", ""), "article_slug": c.get("article_slug", ""), "score": c.get("score", 0)}
         for c in chunks
     ]
-    yield f"data: {json.dumps({'done': True, 'sources': sources})}\n\n"
+    yield f"data: {json.dumps({'done': True, 'sources': sources, 'full_response': ''.join(full_response)})}\n\n"
