@@ -11,7 +11,7 @@ from api.reasoning import decompose_query, detect_canon_filters
 
 router = APIRouter()
 
-SCORE_THRESHOLD = 0.3
+SCORE_THRESHOLD = 0.2
 MAX_CHUNKS_PER_ARTICLE = 2
 
 
@@ -113,6 +113,15 @@ def ask(body: AskRequest, request: Request):
 
     # Sort by score and take top_k
     chunks = sorted(all_chunks.values(), key=lambda c: c["score"], reverse=True)[:body.top_k]
+
+    # Fallback: if decomposed queries found nothing, try the original question directly
+    if not chunks:
+        try:
+            embeddings = generate_embeddings([body.question])
+            query_vector = embeddings[0]
+            chunks = _retrieve_chunks(conn, query_vector, top_k=body.top_k)
+        except Exception:
+            pass
 
     if not chunks:
         raise HTTPException(status_code=404, detail="No relevant content found")
