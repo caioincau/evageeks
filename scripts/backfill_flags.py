@@ -13,6 +13,9 @@ def main():
         cur.execute("""
             ALTER TABLE articles ADD COLUMN IF NOT EXISTS is_redirect BOOLEAN DEFAULT FALSE;
             ALTER TABLE articles ADD COLUMN IF NOT EXISTS is_stub BOOLEAN DEFAULT FALSE;
+            ALTER TABLE articles ADD COLUMN IF NOT EXISTS source_type TEXT DEFAULT 'wiki';
+            ALTER TABLE articles ADD COLUMN IF NOT EXISTS source_url TEXT;
+            ALTER TABLE chunks ADD COLUMN IF NOT EXISTS source_type TEXT DEFAULT 'wiki';
         """)
 
         # Flag redirects

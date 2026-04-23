@@ -116,6 +116,22 @@ def cmd_ingest(args):
     print("Ingest complete.")
 
 
+def cmd_fetch_forum(args):
+    from fetcher.forum import run_forum_fetch
+    config = load_config()
+    data_dir = config["data_dir"]
+    print("=== Fetching forum threads ===")
+    run_forum_fetch(f"{data_dir}/parsed", rate_limit=config.get("rate_limit_delay", 1.0))
+
+
+def cmd_fetch_interviews(args):
+    from fetcher.interviews import run_interview_fetch
+    config = load_config()
+    data_dir = config["data_dir"]
+    print("=== Fetching external interviews ===")
+    run_interview_fetch(f"{data_dir}/parsed", rate_limit=config.get("rate_limit_delay", 1.0))
+
+
 def cmd_serve(args):
     import uvicorn
     from api.main import create_app
@@ -135,6 +151,8 @@ def main():
     subparsers.add_parser("parse", help="Parse wikitext XML into structured JSON")
     subparsers.add_parser("ingest", help="Load parsed articles into PostgreSQL with embeddings")
     subparsers.add_parser("serve", help="Start the REST API on port 8000")
+    subparsers.add_parser("fetch-forum", help="Scrape EvaGeeks forum threads")
+    subparsers.add_parser("fetch-interviews", help="Fetch external interviews")
 
     args = parser.parse_args()
     commands = {
@@ -142,6 +160,8 @@ def main():
         "parse": cmd_parse,
         "ingest": cmd_ingest,
         "serve": cmd_serve,
+        "fetch-forum": cmd_fetch_forum,
+        "fetch-interviews": cmd_fetch_interviews,
     }
     commands[args.command](args)
 

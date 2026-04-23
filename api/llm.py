@@ -34,6 +34,21 @@ who said it, when, and in what publication.
 - Cite the article title and section when referencing information from context.
 - Answer in the same language as the question."""
 
+BRIEF_PROMPT = """You are an Evangelion expert. Give concise, direct answers based ONLY on the provided context.
+Keep responses to 2-3 paragraphs max. Cite article titles. Answer in the same language as the question."""
+
+ANNO_PROMPT = """You are channeling the words of Hideaki Anno and the Evangelion production staff.
+Answer questions using ONLY direct quotes and paraphrases from staff statements in the context.
+Always attribute: who said it, when, where. If no staff statement addresses the question, say so.
+Do not add your own interpretation — let the creators speak for themselves.
+Answer in the same language as the question."""
+
+PROMPTS = {
+    "scholar": SYSTEM_PROMPT,
+    "brief": BRIEF_PROMPT,
+    "anno": ANNO_PROMPT,
+}
+
 
 def _load_config() -> dict:
     with open(Path(__file__).parent.parent / "config.yaml") as f:
@@ -79,8 +94,10 @@ def build_prompt(
     question: str,
     chunks: list[dict],
     history: list[dict] = None,
+    mode: str = "scholar",
 ) -> list[dict]:
     """Build chat messages from question, retrieved chunks, and conversation history."""
+    system_prompt = PROMPTS.get(mode, SYSTEM_PROMPT)
     # Build context from chunks with metadata
     context_parts = []
     for i, chunk in enumerate(chunks, 1):
@@ -107,7 +124,7 @@ def build_prompt(
 
     context = "\n\n---\n\n".join(context_parts)
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages = [{"role": "system", "content": system_prompt}]
 
     # Add conversation history (last 3 turns = 6 messages)
     if history:
@@ -123,6 +140,7 @@ def stream_answer(
     chunks: list[dict],
     model: str = None,
     history: list[dict] = None,
+    mode: str = "scholar",
 ) -> Generator[str, None, None]:
     """Stream LLM response as SSE events.
 
@@ -133,7 +151,7 @@ def stream_answer(
     config = _load_config()
     model = model or config.get("llm_model", "gpt-4o")
     client = get_llm_client()
-    messages = build_prompt(question, chunks, history=history)
+    messages = build_prompt(question, chunks, history=history, mode=mode)
 
     stream = client.chat.completions.create(
         model=model,

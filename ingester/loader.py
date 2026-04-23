@@ -31,7 +31,7 @@ def upsert_article(
                     infobox, templates, internal_links, external_links, iw_links,
                     lang_links, properties, protection, rev_id, length_bytes,
                     parse_warnings, touched_at, fetched_at,
-                    is_redirect, is_stub
+                    is_redirect, is_stub, source_type, source_url
                 ) VALUES (
                     %(page_id)s, %(slug)s, %(title)s, %(display_title)s,
                     %(namespace)s, %(content_model)s, %(language)s, %(wikitext)s,
@@ -40,7 +40,7 @@ def upsert_article(
                     %(external_links)s, %(iw_links)s, %(lang_links)s,
                     %(properties)s, %(protection)s, %(rev_id)s, %(length_bytes)s,
                     %(parse_warnings)s, %(touched_at)s, NOW(),
-                    %(is_redirect)s, %(is_stub)s
+                    %(is_redirect)s, %(is_stub)s, %(source_type)s, %(source_url)s
                 )
                 ON CONFLICT (page_id) DO UPDATE SET
                     slug = EXCLUDED.slug,
@@ -60,7 +60,9 @@ def upsert_article(
                     touched_at = EXCLUDED.touched_at,
                     fetched_at = NOW(),
                     is_redirect = EXCLUDED.is_redirect,
-                    is_stub = EXCLUDED.is_stub
+                    is_stub = EXCLUDED.is_stub,
+                    source_type = EXCLUDED.source_type,
+                    source_url = EXCLUDED.source_url
                 RETURNING id
             """, {
                 "page_id": article.get("page_id"),
@@ -89,6 +91,8 @@ def upsert_article(
                 "touched_at": article.get("touched_at"),
                 "is_redirect": (article.get("wikitext") or "").strip().upper().startswith("#REDIRECT"),
                 "is_stub": len((article.get("wikitext") or "").strip()) < 100,
+                "source_type": article.get("source_type", "wiki"),
+                "source_url": article.get("source_url"),
             })
             article_id = cur.fetchone()[0]
 

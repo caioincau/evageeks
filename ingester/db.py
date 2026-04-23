@@ -50,7 +50,9 @@ def create_schema(conn: connection) -> None:
                     touched_at      TIMESTAMPTZ,
                     fetched_at      TIMESTAMPTZ,
                     is_redirect     BOOLEAN DEFAULT FALSE,
-                    is_stub         BOOLEAN DEFAULT FALSE
+                    is_stub         BOOLEAN DEFAULT FALSE,
+                    source_type     TEXT DEFAULT 'wiki',
+                    source_url      TEXT
                 )
             """)
             cur.execute("""
@@ -72,7 +74,8 @@ def create_schema(conn: connection) -> None:
                     position    INTEGER,
                     token_count INTEGER,
                     embedding   VECTOR(1536),
-                    embed_model TEXT
+                    embed_model TEXT,
+                    source_type TEXT DEFAULT 'wiki'
                 )
             """)
             cur.execute("""

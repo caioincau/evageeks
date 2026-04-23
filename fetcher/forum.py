@@ -1,0 +1,207 @@
+# fetcher/forum.py
+"""Scrape EvaGeeks forum for analysis and discussion threads."""
+import re
+import time
+from pathlib import Path
+from typing import Optional
+import httpx
+from html.parser import HTMLParser
+
+
+FORUM_URL = "https://forum.evageeks.org"
+
+# High-value subforums
+SUBFORUMS = {
+    "evangelion-discussion": 7,
+    "evangelion-analysis": 11,
+    "rebuild-discussion": 15,
+}
+
+
+class _PostParser(HTMLParser):
+    """Extract post text from phpBB HTML."""
+
+    def __init__(self):
+        super().__init__()
+        self._in_post = False
+        self._depth = 0
+        self._text = []
+        self.posts = []
+        self._current_author = ""
+        self._current_date = ""
+        self._in_author = False
+
+    def handle_starttag(self, tag, attrs):
+        attrs_dict = dict(attrs)
+        cls = attrs_dict.get("class", "")
+        if "postbody" in cls or "content" in cls:
+            self._in_post = True
+            self._depth = 0
+            self._text = []
+        if self._in_post:
+            self._depth += 1
+        if "author" in cls or "username" in cls:
+            self._in_author = True
+
+    def handle_endtag(self, tag):
+        if self._in_post:
+            self._depth -= 1
+            if self._depth <= 0:
+                text = " ".join(self._text).strip()
+                text = re.sub(r'\s+', ' ', text)
+                if len(text) > 50:
+                    self.posts.append({
+                        "author": self._current_author,
+                        "content": text,
+                    })
+                self._in_post = False
+                self._text = []
+        if self._in_author:
+            self._in_author = False
+
+    def handle_data(self, data):
+        if self._in_post:
+            self._text.append(data.strip())
+        if self._in_author:
+            self._current_author = data.strip()
+
+
+def fetch_thread_list(
+    subforum_id: int,
+    max_pages: int = 5,
+    session: Optional[httpx.Client] = None,
+    rate_limit: float = 1.0,
+) -> list[dict]:
+    """Fetch thread URLs from a subforum."""
+    session = session or httpx.Client(timeout=30.0, follow_redirects=True)
+    threads = []
+
+    for page in range(max_pages):
+        offset = page * 25
+        url = f"{FORUM_URL}/viewforum.php?f={subforum_id}&start={offset}"
+        try:
+            resp = session.get(url)
+            resp.raise_for_status()
+            html = resp.text
+
+            # Extract thread links: viewtopic.php?t=XXXX
+            for match in re.finditer(r'viewtopic\.php\?[^"]*t=(\d+)[^"]*"[^>]*class="topictitle"[^>]*>([^<]+)', html):
+                tid = match.group(1)
+                title = match.group(2).strip()
+                threads.append({
+                    "thread_id": int(tid),
+                    "title": title,
+                    "url": f"{FORUM_URL}/viewtopic.php?t={tid}",
+                })
+
+            # Stop if no more threads found on this page
+            if f"start={offset + 25}" not in html and page > 0:
+                break
+
+        except Exception as e:
+            print(f"  Error fetching subforum page {page}: {e}")
+
+        time.sleep(rate_limit)
+
+    # Deduplicate by thread_id
+    seen = set()
+    unique = []
+    for t in threads:
+        if t["thread_id"] not in seen:
+            seen.add(t["thread_id"])
+            unique.append(t)
+
+    return unique
+
+
+def fetch_thread_posts(
+    thread_url: str,
+    session: Optional[httpx.Client] = None,
+    rate_limit: float = 1.0,
+) -> list[dict]:
+    """Fetch all posts from a forum thread."""
+    session = session or httpx.Client(timeout=30.0, follow_redirects=True)
+
+    try:
+        resp = session.get(thread_url)
+        resp.raise_for_status()
+        parser = _PostParser()
+        parser.feed(resp.text)
+        time.sleep(rate_limit)
+        return parser.posts
+    except Exception as e:
+        print(f"  Error fetching thread {thread_url}: {e}")
+        return []
+
+
+def run_forum_fetch(
+    output_dir: str,
+    max_threads_per_subforum: int = 50,
+    rate_limit: float = 1.0,
+) -> list[dict]:
+    """Fetch forum threads and save as JSON articles for ingestion."""
+    import json
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    session = httpx.Client(timeout=30.0, follow_redirects=True)
+    all_articles = []
+
+    for subforum_name, subforum_id in SUBFORUMS.items():
+        print(f"Fetching {subforum_name} (id={subforum_id})...")
+        threads = fetch_thread_list(subforum_id, max_pages=3, session=session, rate_limit=rate_limit)
+        print(f"  Found {len(threads)} threads")
+
+        for i, thread in enumerate(threads[:max_threads_per_subforum]):
+            posts = fetch_thread_posts(thread["url"], session=session, rate_limit=rate_limit)
+            if not posts:
+                continue
+
+            # Combine posts into article-like structure
+            combined_content = []
+            for post in posts:
+                author = post.get("author", "Anonymous")
+                combined_content.append(f"[{author}]: {post['content']}")
+
+            wikitext = "\n\n".join(combined_content)
+            slug = f"forum_{subforum_name}_{thread['thread_id']}"
+
+            article = {
+                "page_id": 1000000 + thread["thread_id"],
+                "slug": slug,
+                "title": thread["title"],
+                "display_title": thread["title"],
+                "namespace": 0,
+                "content_model": "forum",
+                "language": "en",
+                "wikitext": wikitext,
+                "html": "",
+                "summary": wikitext[:500],
+                "sections": [],
+                "categories": [f"Forum: {subforum_name}"],
+                "infobox": {},
+                "templates": [],
+                "internal_links": [],
+                "external_links": [],
+                "iw_links": [],
+                "lang_links": [],
+                "properties": {},
+                "protection": [],
+                "rev_id": None,
+                "length_bytes": len(wikitext),
+                "parse_warnings": [],
+                "touched_at": None,
+                "references": [],
+                "source_type": "forum",
+                "source_url": thread["url"],
+            }
+
+            outfile = output_path / f"{slug}.json"
+            outfile.write_text(json.dumps(article, ensure_ascii=False, default=str))
+            all_articles.append(article)
+
+            if (i + 1) % 10 == 0:
+                print(f"  Fetched {i + 1}/{min(len(threads), max_threads_per_subforum)} threads")
+
+    print(f"Total: {len(all_articles)} forum articles saved to {output_path}")
+    return all_articles
