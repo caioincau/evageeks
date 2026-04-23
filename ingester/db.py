@@ -48,7 +48,9 @@ def create_schema(conn: connection) -> None:
                     length_bytes    INTEGER,
                     parse_warnings  TEXT[],
                     touched_at      TIMESTAMPTZ,
-                    fetched_at      TIMESTAMPTZ
+                    fetched_at      TIMESTAMPTZ,
+                    is_redirect     BOOLEAN DEFAULT FALSE,
+                    is_stub         BOOLEAN DEFAULT FALSE
                 )
             """)
             cur.execute("""

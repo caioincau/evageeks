@@ -61,9 +61,14 @@ def build_prompt(question: str, chunks: list[dict]) -> list[dict]:
     context_parts = []
     for i, chunk in enumerate(chunks, 1):
         title = chunk.get("article_title", "Unknown")
+        section = chunk.get("section", "")
         content = chunk.get("content", "")
         score = chunk.get("score", 0)
-        context_parts.append(f"[{i}] Article: {title} (relevance: {score:.2f})\n{content}")
+        header = f"[{i}] Article: {title}"
+        if section and section != "_intro":
+            header += f" > {section}"
+        header += f" (relevance: {score:.2f})"
+        context_parts.append(f"{header}\n{content}")
 
     context = "\n\n---\n\n".join(context_parts)
 

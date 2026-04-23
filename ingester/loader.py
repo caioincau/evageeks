@@ -30,7 +30,8 @@ def upsert_article(
                     language, wikitext, html, summary, sections, categories,
                     infobox, templates, internal_links, external_links, iw_links,
                     lang_links, properties, protection, rev_id, length_bytes,
-                    parse_warnings, touched_at, fetched_at
+                    parse_warnings, touched_at, fetched_at,
+                    is_redirect, is_stub
                 ) VALUES (
                     %(page_id)s, %(slug)s, %(title)s, %(display_title)s,
                     %(namespace)s, %(content_model)s, %(language)s, %(wikitext)s,
@@ -38,7 +39,8 @@ def upsert_article(
                     %(infobox)s, %(templates)s, %(internal_links)s,
                     %(external_links)s, %(iw_links)s, %(lang_links)s,
                     %(properties)s, %(protection)s, %(rev_id)s, %(length_bytes)s,
-                    %(parse_warnings)s, %(touched_at)s, NOW()
+                    %(parse_warnings)s, %(touched_at)s, NOW(),
+                    %(is_redirect)s, %(is_stub)s
                 )
                 ON CONFLICT (page_id) DO UPDATE SET
                     slug = EXCLUDED.slug,
@@ -56,7 +58,9 @@ def upsert_article(
                     rev_id = EXCLUDED.rev_id,
                     length_bytes = EXCLUDED.length_bytes,
                     touched_at = EXCLUDED.touched_at,
-                    fetched_at = NOW()
+                    fetched_at = NOW(),
+                    is_redirect = EXCLUDED.is_redirect,
+                    is_stub = EXCLUDED.is_stub
                 RETURNING id
             """, {
                 "page_id": article.get("page_id"),
@@ -83,6 +87,8 @@ def upsert_article(
                 "length_bytes": article.get("length_bytes"),
                 "parse_warnings": article.get("parse_warnings", []),
                 "touched_at": article.get("touched_at"),
+                "is_redirect": (article.get("wikitext") or "").strip().upper().startswith("#REDIRECT"),
+                "is_stub": len((article.get("wikitext") or "").strip()) < 100,
             })
             article_id = cur.fetchone()[0]
 

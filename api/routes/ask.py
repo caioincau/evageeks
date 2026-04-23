@@ -36,6 +36,7 @@ def ask(body: AskRequest, request: Request):
                 1 - (c.embedding <=> %s::vector) AS score
             FROM chunks c
             JOIN articles a ON a.id = c.article_id
+            WHERE a.is_redirect IS NOT TRUE
             ORDER BY c.embedding <=> %s::vector
             LIMIT %s
         """, (query_vector, query_vector, body.top_k))
