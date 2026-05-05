@@ -132,6 +132,46 @@ def cmd_fetch_interviews(args):
     run_interview_fetch(f"{data_dir}/parsed", rate_limit=config.get("rate_limit_delay", 1.0))
 
 
+def cmd_fetch_transcripts(args):
+    from fetcher.transcripts import run_transcript_fetch
+    config = load_config()
+    data_dir = config["data_dir"]
+    print("=== Fetching episode transcripts ===")
+    run_transcript_fetch(f"{data_dir}/parsed")
+
+
+def cmd_fetch_youtube(args):
+    from fetcher.youtube import run_youtube_fetch
+    config = load_config()
+    data_dir = config["data_dir"]
+    print("=== Fetching YouTube analysis transcripts ===")
+    run_youtube_fetch(f"{data_dir}/parsed")
+
+
+def cmd_fetch_tvtropes(args):
+    from fetcher.tvtropes import run_tvtropes_fetch
+    config = load_config()
+    data_dir = config["data_dir"]
+    print("=== Fetching TV Tropes pages ===")
+    run_tvtropes_fetch(f"{data_dir}/parsed")
+
+
+def cmd_fetch_anilist(args):
+    from fetcher.anilist import run_anilist_fetch
+    config = load_config()
+    data_dir = config["data_dir"]
+    print("=== Fetching AniList metadata ===")
+    run_anilist_fetch(f"{data_dir}/parsed")
+
+
+def cmd_fetch_wikidata(args):
+    from fetcher.wikidata import run_wikidata_fetch
+    config = load_config()
+    data_dir = config["data_dir"]
+    print("=== Fetching Wikidata relationships ===")
+    run_wikidata_fetch(f"{data_dir}/parsed")
+
+
 def cmd_serve(args):
     import uvicorn
     from api.main import create_app
@@ -153,6 +193,11 @@ def main():
     subparsers.add_parser("serve", help="Start the REST API on port 8000")
     subparsers.add_parser("fetch-forum", help="Scrape EvaGeeks forum threads")
     subparsers.add_parser("fetch-interviews", help="Fetch external interviews")
+    subparsers.add_parser("fetch-transcripts", help="Fetch episode transcripts")
+    subparsers.add_parser("fetch-youtube", help="Fetch YouTube analysis transcripts")
+    subparsers.add_parser("fetch-tvtropes", help="Fetch TV Tropes pages")
+    subparsers.add_parser("fetch-anilist", help="Fetch AniList metadata")
+    subparsers.add_parser("fetch-wikidata", help="Fetch Wikidata relationships")
 
     args = parser.parse_args()
     commands = {
@@ -162,6 +207,11 @@ def main():
         "serve": cmd_serve,
         "fetch-forum": cmd_fetch_forum,
         "fetch-interviews": cmd_fetch_interviews,
+        "fetch-transcripts": cmd_fetch_transcripts,
+        "fetch-youtube": cmd_fetch_youtube,
+        "fetch-tvtropes": cmd_fetch_tvtropes,
+        "fetch-anilist": cmd_fetch_anilist,
+        "fetch-wikidata": cmd_fetch_wikidata,
     }
     commands[args.command](args)
 
